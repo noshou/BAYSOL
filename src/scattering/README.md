@@ -25,7 +25,7 @@ Orthonormality of `Y_lm` on the sphere kills every cross term of `|A|²` (the ph
 I(q)=4\pi\sum_{l}\sum_{m=-l}^{l}|B_{lm}(q)|^2
 ```
 
-Summed over all `l` this equals the Debye formula `Σ_ij f_i f_j sin(q r_ij)/(q r_ij)` (Gegenbauer's addition theorem), so the only error is the truncation at the band limit `lMax` chosen by the caller (`Utils.Shannon.autoLmax`, `⌈qMax·D⌉`). For real `f_i`, `Y_{l,−m} = (−1)^m Y_lm^*` gives `|B_{l,−m}| = |B_lm|`, so only `m = 0..l` is stored, weighted 1 for `m = 0` and 2 otherwise (`partialWaveWeights`). Complex form factors `f = f0 + f' + i f''` are split into a real and an imaginary channel whose `|B|²` add incoherently; this is exact. At q → 0 only `l = 0` survives and `I(0) = (Σ f_i(0))²`.
+Summed over all `l` this equals the Debye formula `Σ_ij f_i f_j sin(q r_ij)/(q r_ij)` (Gegenbauer's addition theorem), so the only error is the truncation at the band limit `lMax` chosen by the caller (`DataGrid.autoLmax`, `⌈qMax·D⌉`). For real `f_i`, `Y_{l,−m} = (−1)^m Y_lm^*` gives `|B_{l,−m}| = |B_lm|`, so only `m = 0..l` is stored, weighted 1 for `m = 0` and 2 otherwise (`partialWaveWeights`). Complex form factors `f = f0 + f' + i f''` are split into a real and an imaginary channel whose `|B|²` add incoherently; this is exact. At q → 0 only `l = 0` survives and `I(0) = (Σ f_i(0))²`.
 
 ### Species and the Gram matrix
 

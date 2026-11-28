@@ -21,7 +21,7 @@ export Solute, Protein, NonBiological, Polymer, DNA, RNA, CustomNonBio, CustomPo
 Temperature, °C, at which the bundled partial-molar-volume tables are tabulated
 (see bulk-electron-density/README.md: 298.15 K unless a source says otherwise): the
 standard reference temperature,
-[`STANDARD_TEMPERATURE_C`](@ref BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C).
+[`STANDARD_TEMPERATURE_C`](@ref BAYSOL.PhysicalConstants.STANDARD_TEMPERATURE_C).
 """
 const PMV_REFERENCE_TEMPERATURE_C = STANDARD_TEMPERATURE_C
 
@@ -58,7 +58,7 @@ Default solution temperature, °C, for [`ρₑ`](@ref)'s bulk electron density c
 the sample's real temperature instead whenever it is known: water's density is evaluated at
 it exactly, and the solutes' 25 °C partial molar volumes get a widened uncertainty (see
 [`PMV_FRACTIONAL_EXPANSIBILITY`](@ref)). Defaults to the standard reference temperature,
-[`STANDARD_TEMPERATURE_C`](@ref `BAYSOL.Utils.PhysicalConstants.STANDARD_TEMPERATURE_C`),
+[`STANDARD_TEMPERATURE_C`](@ref `BAYSOL.PhysicalConstants.STANDARD_TEMPERATURE_C`),
 the same temperature the PMV tables are given at, so the default never widens their
 uncertainty.
 """

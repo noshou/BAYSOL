@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
-# Tests for src/utils/shannon.jl: the exact point-cloud diameter,
+# Tests for src/data-grid/ (data-grid.jl, shannon.jl, ...): the exact point-cloud diameter,
 # the Shannon binning of a measured curve, the model curve on the
 # measured grid, and the residual-structure statistics.
 #
@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "..", "testsetup.jl"))
 using Random
 using Statistics
 using LinearAlgebra
-using BAYSOL.Shannon: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloudDiameter, autoLmax,
+using BAYSOL.DataGrid: ShannonInfo, SHANNON_REBIN, BIN_BIAS_MAX, cloudDiameter, autoLmax,
     shannonData, modelOnRaw, rawInterpolation,
     residualStructure, binBiasRatio, _runsZ
 using BAYSOL.BulkElectronDensity: NonBiological, Solute
@@ -25,7 +25,7 @@ bruteDiameter(P) = maximum(
     (sqrt(sum(abs2, P[:, i] .- P[:, j])) for i in 1:size(P, 2) for j in 1:size(P, 2))
 )
 
-@testset "Shannon" begin
+@testset "DataGrid" begin
 
     @testset "cloudDiameter" begin
         rng = MersenneTwister(1)
@@ -66,6 +66,12 @@ bruteDiameter(P) = maximum(
             planar = vcat(randn(rng, 2, 30), zeros(1, 30))
             # coplanar
             @test checkFloat(cloudDiameter(planar), bruteDiameter(planar))
+            # a cloud only a few tolerances thick (the hull lost rim vertices there)
+            for k in 10:14, _ in 1:40
+                thin = randn(rng, 3, rand(rng, 4:200))
+                thin[3, :] .*= 10.0^(-k)
+                @test checkFloat(cloudDiameter(thin), bruteDiameter(thin))
+            end
             # repeated point
             @test cloudDiameter(fill(1.5, 3, 6)) == 0.0
             # two points

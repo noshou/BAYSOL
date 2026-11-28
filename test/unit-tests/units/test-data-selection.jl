@@ -16,7 +16,7 @@ using BAYSOL.BulkElectronDensity: Solute, NonBiological
 using BAYSOL.Pipeline:
     _checkedValue, settingKind, _selectCurve, _applyKeywords!,
     _relationProblems
-using BAYSOL.Shannon: modelOnRaw, rawInterpolation
+using BAYSOL.DataGrid: modelOnRaw, rawInterpolation
 using Logging
 
 const _DS_CRAMBIN = joinpath(@__DIR__, "..", "..", "fixtures", "molecules", "1CRN-TEST.pdb")

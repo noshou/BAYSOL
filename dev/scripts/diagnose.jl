@@ -60,7 +60,7 @@ function residual_report(out, seed; label)
     ŷ, wfit, _ = Fit.profiledCorrs(seed.wls, ξ, seed.fw; tables = seed.c1tab)
     pred = Fit.wlsPredict(wfit, ŷ)
     r = (seed.wls.iObs .- pred) .* sqrt.(seed.wls.weights)
-    rs = BAYSOL.Shannon.residualStructure(r)
+    rs = BAYSOL.DataGrid.residualStructure(r)
     println(
         out,
         @sprintf("%s: fitted grid   %4d points  lag-1 %+.3f  runs z %+.2f  χ²_red %.4g",
@@ -68,8 +68,8 @@ function residual_report(out, seed; label)
     )
     sh = seed.shannon
     if sh !== nothing && sh.rebin > 0
-        r_raw = (sh.iRaw .- BAYSOL.Shannon.modelOnRaw(sh, pred)) ./ sh.σ_raw
-        rr = BAYSOL.Shannon.residualStructure(r_raw)
+        r_raw = (sh.iRaw .- BAYSOL.DataGrid.modelOnRaw(sh, pred)) ./ sh.σ_raw
+        rr = BAYSOL.DataGrid.residualStructure(r_raw)
         println(
             out,
             @sprintf("%s: measured grid %4d points  lag-1 %+.3f  runs z %+.2f  χ²_red %.4g",

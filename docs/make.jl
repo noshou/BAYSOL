@@ -14,7 +14,7 @@ using BAYSOL
 # (plus its README and api page).
 # ---------------------------------------------------------------------------
 const DOC_MODULES = [
-    "Utils"               => BAYSOL.Utils,
+    "DataGrid"            => BAYSOL.DataGrid,
     "Runtime"             => BAYSOL.Runtime,
     "Geometry"            => BAYSOL.Geometry,
     "BulkElectronDensity" => BAYSOL.BulkElectronDensity,
@@ -25,10 +25,11 @@ const DOC_MODULES = [
     "Pipeline"            => BAYSOL.Pipeline,
 ]
 
-# Documented modules that have no module README of their own: the submodules of Utils
-# (covered by its page) and Platform (platform.jl at the root, `api/platform.md`; its guide
-# is a section of dev/README.md).
-const DOC_SUBMODULES = [BAYSOL.PhysicalConstants, BAYSOL.Shannon, BAYSOL.Platform]
+# Documented modules that have no module README of their own, the files at
+# the root: PhysicalConstants (physical-constants.jl in src/,
+# `api/physical-constants.md`) and Platform (platform.jl at the root of the
+# repository, `api/platform.md`; its guide is a section of dev/README.md).
+const DOC_SUBMODULES = [BAYSOL.PhysicalConstants, BAYSOL.Platform]
 
 # A module whose API reference spans several pages lists them here (title =>
 # page); every other module has the single page `api/<lowercase name>.md`.
@@ -192,9 +193,10 @@ makedocs(
     ],
     "API Reference" => vcat(
     [name => api_pages(name) for (name, _) in DOC_MODULES],
-    # the operating-system module (platform.jl at the root, no README of its own: its
-    # guide is a section of dev/README.md)
-    ["Platform" => "api/platform.md"]
+    # the root files without a README of their own: the physical constants (its page holds
+    # the table of constants) and the operating-system module (platform.jl at the root of
+    # the repository: its guide is a section of dev/README.md)
+    ["Physical constants" => "api/physical-constants.md", "Platform" => "api/platform.md"]
     )
     ],
     # :exports would require every exported docstring across every submodule

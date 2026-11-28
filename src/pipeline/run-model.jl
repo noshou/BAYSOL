@@ -76,37 +76,37 @@ not be comparable with the depositor's, which covers the program's own range.
 # Returns
 - `BitVector`, one entry per raw point; `true` where the point enters the χ².
 """
-function _chisqMask(sh::Shannon.ShannonInfo)::BitVector
+function _chisqMask(sh::DataGrid.ShannonInfo)::BitVector
     return (sh.qRaw .>= first(sh.q)) .& (sh.qRaw .<= last(sh.q))
 end
 
 """
 The reduced χ² of the model curve `y` (on the fitted grid of `sh`) against
 the measured curve: `y` is interpolated onto the measured q points
-([`Shannon.modelOnRaw`](@ref BAYSOL.Utils.Shannon.modelOnRaw)) and the
+([`DataGrid.modelOnRaw`](@ref BAYSOL.DataGrid.modelOnRaw)) and the
 sum of squared normalized residuals over the raw points inside the fitted range
 ([`_chisqMask`](@ref)) is divided by their number less the three parameters fitted
 to the curve by minimization (scale, background and the excluded-volume correction
 c1). This is the χ² on the grid a program such as CRYSOL or FoXS evaluates,
 whatever binning the fit used.
 """
-function _chisqMeasured(sh::Shannon.ShannonInfo, y::AbstractVector{<:Real})::Float64
+function _chisqMeasured(sh::DataGrid.ShannonInfo, y::AbstractVector{<:Real})::Float64
     use = _chisqMask(sh)
-    r = ((sh.iRaw .- Shannon.modelOnRaw(sh, y)) ./ sh.σ_raw)[use]
+    r = ((sh.iRaw .- DataGrid.modelOnRaw(sh, y)) ./ sh.σ_raw)[use]
     return sum(abs2, r) / (length(r) - 3)
 end
 
 """
 [`_chisqMeasured`](@ref) of every column of `curves` (models on the fitted grid), in
-one matrix product with [`Shannon.rawInterpolation`](@ref) instead of a spline per
+one matrix product with [`DataGrid.rawInterpolation`](@ref) instead of a spline per
 column, in blocks of columns so that the measured-grid residuals stay small.
 
 # Returns
 - `Vector{Float64}`, one reduced χ² per column.
 """
-function _chisqMeasuredAll(sh::Shannon.ShannonInfo, curves::AbstractMatrix{<:Real})
+function _chisqMeasuredAll(sh::DataGrid.ShannonInfo, curves::AbstractMatrix{<:Real})
     use = findall(_chisqMask(sh))
-    M = Shannon.rawInterpolation(sh)[use, :]
+    M = DataGrid.rawInterpolation(sh)[use, :]
     iUse = sh.iRaw[use]
     σUse = sh.σ_raw[use]
     nUse = length(use)

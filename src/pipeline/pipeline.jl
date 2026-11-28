@@ -15,7 +15,7 @@ using ..Runtime: StageLog, tick, tock!, timed!, stageSeconds, withGcPaused, tmap
 using ..MolecularStructure: MolecularStructure
 using ..Hydrogenator: Hydrogenator, Propka
 using ..Geometry: Geometry, sasa, PROBE_RADIUS
-using ..Shannon: Shannon, SHANNON_REBIN
+using ..DataGrid: DataGrid, SHANNON_REBIN
 using ..Scattering: Scattering, B_LM_CHUNK, SHELL_THICKNESS
 using ..BulkElectronDensity: Solute, DEFAULT_TEMPERATURE_C
 using ..Inference: Inference, κ_δρ₁₂, κ_δρ₃, PMV_FALLBACK_UNCERT, TARGET_ACCEPT

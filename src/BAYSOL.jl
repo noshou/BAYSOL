@@ -10,17 +10,15 @@ module BAYSOL
 # repository by relative path, see platform.jl).
 include("../platform.jl")
 
-include("utils/utils.jl")
+# The physical constants (one root file, like platform.jl and precompile.jl) and the
+# DataGrid module are bound here, before the modules that import them by name are included.
+include("physical-constants.jl")
+include("data-grid/data-grid.jl")
 
-# The Utils submodules are bound here,
-# before the modules that import them by
-# name are included. Utils is the only module
-# with submodules; every other module is one module.
-using .Utils: Utils
-using .Utils.PhysicalConstants: PhysicalConstants
-using .Utils.Shannon: Shannon
+using .PhysicalConstants: PhysicalConstants
+using .DataGrid: DataGrid
 
-# Runtime needs PhysicalConstants (Timing), so it comes second.
+# Runtime needs PhysicalConstants (Timing), so it comes after them.
 include("runtime/runtime.jl")
 using .Runtime: Runtime
 

@@ -32,7 +32,7 @@ A fitting-test script that throws (`NotConvergedError` after the retry, or anyth
 
 1. resolve the structure (`MolecularStructure`), look its residue names up (`components`), run the `structure checks` (reused chain ids, duplicate atoms, dummy-like models) and choose the hydrogenation from the content (`classify`);
 2. `Hydrogenator`: PROPKA unless the structure is a nucleic acid alone, then pdb2pqr (PARSE, or AMBER for a nucleic acid alone), with modified residues hydrogenated through their parent;
-3. the solvent-accessible surface and the diameter `D` of the scatterer cloud (atoms **and** beads), `Utils.Shannon` binning of the curve to `rebin` bins per channel `π/D`, and `lMax = ⌈qMax D⌉`;
+3. the solvent-accessible surface and the diameter `D` of the scatterer cloud (atoms **and** beads), `Shannon` binning of the curve to `rebin` bins per channel `π/D`, and `lMax = ⌈qMax D⌉`;
 4. `Scattering.forwardCache` (the Gram matrix), the priors from the buffer `solutes` (`BulkElectronDensity.ρₑ`), and `Inference.seedSampler`.
 
 `runModel` calls `Inference.infer` (8 chains, MAP search, harvest, mode pooling, one retry when R̂ or ESS says the run is not converged), throws `NotConvergedError` (and so reports nothing) if it is still not converged after the retry, drops each chain's warm-up, picks the MAP draw (highest non-divergent `log π`) and computes the quantile intervals and bands. Its result holds everything the workbook reports; developer diagnostics live in the dev tools (`bysl fits diagnose`).

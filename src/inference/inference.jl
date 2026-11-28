@@ -6,7 +6,7 @@ Sampling and statistics for BAYSOL.
 module Inference
 
 using ..BulkElectronDensity: BulkElectronDensity, Solute, DEFAULT_TEMPERATURE_C
-using ..Shannon: ShannonInfo
+using ..DataGrid: ShannonInfo
 using AdvancedHMC: AdvancedHMC, DenseEuclideanMetric, Hamiltonian, MassMatrixAdaptor,
     find_good_stepsize, Leapfrog, StanHMCAdaptor, StepSizeAdaptor,
     HMCKernel, Trajectory, MultinomialTS, GeneralisedNoUTurn, pm_next!
@@ -412,7 +412,7 @@ Everything [`infer`](@ref) needs to start a NUTS chain.
     share across threads.
 -   `shannon::Union{Nothing,ShannonInfo}`: how the measured curve was reduced to the
     data `wls` holds (diameter, band limit, binning, raw data), when it came
-    through [`Shannon.shannonData`](@ref BAYSOL.Utils.Shannon.shannonData);
+    through [`DataGrid.shannonData`](@ref BAYSOL.DataGrid.shannonData);
     `nothing` otherwise.
 """
 struct Seed{T<:Real,N}

@@ -79,7 +79,7 @@ Computes a NUTS seed from given data input:
     3.  compute the accessible surface (the hydration-shell beads), take
         the diameter `D` of the whole scatterer cloud (atoms and beads),
         bin the measured curve to the Shannon channels that diameter allows
-        ([`Shannon.shannonData`](@ref BAYSOL.Utils.Shannon.shannonData))
+        ([`DataGrid.shannonData`](@ref BAYSOL.DataGrid.shannonData))
         and pick the band limit from it
     4.  build the forward-model (gram matrix) on the binned q grid
     5.  produce a [`Inference.Seed`](@ref).
@@ -110,15 +110,15 @@ Computes a NUTS seed from given data input:
     least this many: a precise curve gets finer bins, until the binning's
     worst-case bias is below `maxBinBias` of its smallest error bar (the number
     used is the report's `rebin` line); `nothing` fits the unbinned curve.
--   `maxBinBias::Real = Shannon.BIN_BIAS_MAX`: that bound, 0.3 by default; `Inf` keeps
+-   `maxBinBias::Real = DataGrid.BIN_BIAS_MAX`: that bound, 0.3 by default; `Inf` keeps
     `rebin` as given. The data the fit used, the raw data and the choices made are in
-    `seed.shannon` ([`Shannon.ShannonInfo`](@ref BAYSOL.Utils.Shannon.ShannonInfo)).
+    `seed.shannon` ([`DataGrid.ShannonInfo`](@ref BAYSOL.DataGrid.ShannonInfo)).
 -   `lMax::Union{Nothing,Integer} = LMAX`: spherical-harmonic band
     limit for the forward model (the setting `LMAX`); `nothing`, the default, takes
-    `ceil(qMax·D)` ([`Shannon.autoLmax`](@ref BAYSOL.Utils.Shannon.autoLmax)),
+    `ceil(qMax·D)` ([`DataGrid.autoLmax`](@ref BAYSOL.DataGrid.autoLmax)),
     `qMax` the largest binned q; an integer pins it.
 -   `dropNonpositive::Bool = true`: drop the (binned) points whose intensity is not
-    positive ([`Shannon.shannonData`](@ref BAYSOL.Utils.Shannon.shannonData)).
+    positive ([`DataGrid.shannonData`](@ref BAYSOL.DataGrid.shannonData)).
 -   `addHydrogens::Bool = ADD_HYDROGENS`: whether to run PROPKA + Pdb2pqr at all (the
     setting `ADD_HYDROGENS`, true by default).
     false skips both and the forward model runs on the structure exactly as
@@ -239,7 +239,7 @@ function seedModel(
     σ_pH::Real,
     solutes::Vector{Solute};
     rebin::Union{Nothing,Integer} = SHANNON_REBIN,
-    maxBinBias::Real = Shannon.BIN_BIAS_MAX,
+    maxBinBias::Real = DataGrid.BIN_BIAS_MAX,
     lMax::Union{Nothing,Integer} = LMAX,
     dropNonpositive::Bool = true,
     addHydrogens::Bool = ADD_HYDROGENS,
@@ -462,10 +462,10 @@ function seedModel(
         info  = timed!(
         log, :static, 1, "shannon (diameter, binning)"
 ) do
-            D = Shannon.cloudDiameter(
+            D = DataGrid.cloudDiameter(
             hcat(MolecularStructure.coordsCartesian(mol), shell[1])
 )
-            Shannon.shannonData(
+            DataGrid.shannonData(
             qvals,
             iExp,
             σ_exp;
